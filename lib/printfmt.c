@@ -87,6 +87,7 @@ vprintfmt(void (*putch)(int, void*), void *putdat, const char *fmt, va_list ap)
 	unsigned long long num;
 	int base, lflag, width, precision, altflag;
 	char padc;
+        char *printn;
 
 	while (1) {
 		while ((ch = *(unsigned char *) fmt++) != '%') {
@@ -206,14 +207,15 @@ vprintfmt(void (*putch)(int, void*), void *putdat, const char *fmt, va_list ap)
 		// (unsigned) octal
 		case 'o':
 			// Replace this with your code.
-			putch('X', putdat);
-			putch('X', putdat);
-			putch('X', putdat);
+			//putch('0', putdat);
+			num = getuint(&ap,lflag);
+			base = 8;
+			goto number;
 			break;
 
 		// pointer
 		case 'p':
-			putch('0', putdat);
+			//putch('0', putdat);
 			putch('x', putdat);
 			num = (unsigned long long)
 				(uintptr_t) va_arg(ap, void *);
@@ -245,11 +247,17 @@ vprintfmt(void (*putch)(int, void*), void *putdat, const char *fmt, va_list ap)
             //        is beyond the range of the integers the signed char type 
             //        can represent.
 
-            const char *null_error = "\nerror! writing through NULL pointer! (%n argument)\n";
-            const char *overflow_error = "\nwarning! The value %n argument pointed to has been overflowed!\n";
+            const char *null_error = "\nerror! writing through NULL pointer! (%%n argument)\n";
+            const char *overflow_error = "\nwarning! The value %%n argument pointed to has been overflowed!\n";
 
             // Your code here
-
+            printn = (char*)va_arg(ap,char *);
+            if(printn == 0) cprintf(null_error);
+            else
+            {
+                if(*(int *)putdat > 127) cprintf(overflow_error);
+                *printn = (char)(*(int *)putdat);
+            }
             break;
         }
 
