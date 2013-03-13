@@ -17,6 +17,7 @@ start:
 
   # Set up the important data segment registers (DS, ES, SS).
   xorw    %ax,%ax             # Segment number zero
+  #movw    $PROT_MODE_CSEG, %ax
   movw    %ax,%ds             # -> Data Segment
   movw    %ax,%es             # -> Extra Segment
   movw    %ax,%ss             # -> Stack Segment
@@ -45,6 +46,8 @@ seta20.2:
   # and segment translation that makes virtual addresses 
   # identical to their physical addresses, so that the 
   # effective memory map does not change during the switch.
+  #xorw    %bx, %bx
+  movw    $PROT_MODE_CSEG, %bx
   lgdt    gdtdesc
   movl    %cr0, %eax
   orl     $CR0_PE_ON, %eax
@@ -52,7 +55,42 @@ seta20.2:
   
   # Jump to next instruction, but in 32-bit code segment.
   # Switches processor into 32-bit mode.
+  xorw    %bx, %bx
+  movw    $PROT_MODE_CSEG, %bx
+  xorw    %bx, %bx
+  movw    $PROT_MODE_CSEG, %bx
+  xorw    %bx, %bx
+  movw    $PROT_MODE_CSEG, %bx
+  xorw    %bx, %bx
+  movw    $PROT_MODE_CSEG, %bx
+  xorw    %bx, %bx
+  movw    $PROT_MODE_CSEG, %bx
+  xorw    %bx, %bx
+  movw    $PROT_MODE_CSEG, %bx
+  xorw    %bx, %bx
+  movw    $PROT_MODE_CSEG, %bx
+  xorw    %bx, %bx
+  movw    $PROT_MODE_CSEG, %bx
+  xorw    %bx, %bx
+  movw    $PROT_MODE_CSEG, %bx
+  xorw    %bx, %bx
+  movw    $PROT_MODE_CSEG, %bx
+  xorw    %bx, %bx
+  movw    $PROT_MODE_CSEG, %bx
+  xorw    %bx, %bx
+  movw    $PROT_MODE_CSEG, %bx
+  xorw    %bx, %bx
+  movw    $PROT_MODE_CSEG, %bx
+  xorw    %bx, %bx
+  movw    $PROT_MODE_CSEG, %bx
+  xorw    %bx, %bx
+  movw    $PROT_MODE_CSEG, %bx
+  xorw    %bx, %bx
+  movw    $PROT_MODE_CSEG, %bx
+  xorw    %bx, %bx
+  movw    $PROT_MODE_CSEG, %bx
   ljmp    $PROT_MODE_CSEG, $protcseg
+  #movw    %bx, %cs
 
   .code32                     # Assemble for 32-bit mode
 protcseg:
