@@ -135,7 +135,6 @@ mem_init(void)
 
 	// Find out how much memory the machine has (npages & npages_basemem).
 	i386_detect_memory();
-
 	// Remove this line when you're ready to test this function.
 	//panic("mem_init: This function is not finished\n");
 
@@ -169,12 +168,10 @@ mem_init(void)
 	// particular, we can now map memory using boot_map_region
 	// or page_insert
 	page_init();
-
 	check_page_free_list(1);
 	check_page_alloc();
     check_page();
 	check_four_pages();
-    panic("wgg\n");
 
 	//////////////////////////////////////////////////////////////////////
 	// Now we set up virtual memory
@@ -186,7 +183,9 @@ mem_init(void)
 	//      (ie. perm = PTE_U | PTE_P)
 	//    - pages itself -- kernel RW, user NONE
 	// Your code goes here:
-
+    boot_map_region(kern_pgdir,UPAGES,PTSIZE,PADDR(pages),PTE_U|PTE_P);
+    //boot_map_region(kern_pgdir,UVPT,PTSIZE,UVPT,PTE_U|PTE_P);
+    //boot_map_region(kern_pgdir,UTOP,PTSIZE,UTOP,PTE_U|PTE_P);
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
 	// stack.  The kernel stack grows down from virtual address KSTACKTOP.
@@ -198,7 +197,20 @@ mem_init(void)
 	//       overwrite memory.  Known as a "guard page".
 	//     Permissions: kernel RW, user NONE
 	// Your code goes here:
-
+    /*
+    physaddr_t kbase = (physaddr_t)(KSTACKTOP - KSTKSIZE);
+    physaddr_t ksize = (physaddr_t)KSTKSIZE;
+    physaddr_t bbase = (physaddr_t)PADDR(bootstack);
+    while(ksize > 0)
+    {
+        cprintf("bbase:0x%x\n",bbase);
+        page_insert(kern_pgdir,pa2page(bbase),(void *)kbase,PTE_P|PTE_W);
+        kbase+=PGSIZE;
+        bbase+=PGSIZE;
+        ksize-=PGSIZE;
+    }*/
+    boot_map_region(kern_pgdir,KSTACKTOP-KSTKSIZE,KSTKSIZE,PADDR(bootstack),PTE_P|PTE_W);
+    //boot_map_region(kern_pgdir,KSTACKTOP-PTSIZE,PTSIZE-KSTKSIZE,~0,PTE_P);
 	//////////////////////////////////////////////////////////////////////
 	// Map all of physical memory at KERNBASE.
 	// Ie.  the VA range [KERNBASE, 2^32) should map to
@@ -207,10 +219,24 @@ mem_init(void)
 	// we just set up the mapping anyway.
 	// Permissions: kernel RW, user NONE
 	// Your code goes here:
-
+    /*
+    kbase = (physaddr_t)(KERNBASE);
+    ksize = (physaddr_t)(~0 - KERNBASE + 1);
+    bbase = (physaddr_t)0;
+    while(ksize > 0)
+    {
+        cprintf("bbase:0x%x\nkbase:0x%x\n",bbase,kbase);
+        page_insert(kern_pgdir,pa2page(bbase),(void *)kbase,PTE_P|PTE_W);
+        kbase+=PGSIZE;
+        bbase+=PGSIZE;
+        ksize-=PGSIZE;
+    }
+    */
+    boot_map_region(kern_pgdir,KERNBASE,~0-KERNBASE+1,0,PTE_P|PTE_W);
 	// Check that the initial page directory has been set up correctly.
 	check_kern_pgdir();
 
+    //panic("wgg\n");
 	// Switch from the minimal entry page directory to the full kern_pgdir
 	// page table we just created.	Our instruction pointer should be
 	// somewhere between KERNBASE and KERNBASE+4MB right now, which is
@@ -267,12 +293,10 @@ page_init(void)
 	// free pages!
 	size_t i;
     char * kernelUsed = boot_alloc(0);
-	for (i = 0; i < npages; i++) {
-        //cprintf("here!\n");
-        if(i == 0) continue;
+	for (i = npages-1; i >= 0; i--) {
+        if(i == 0) break;//size_t is no sign mean never less than 0,if use continue, very worse
         if(page2pa(&pages[i])>=IOPHYSMEM && page2pa(&pages[i]) <EXTPHYSMEM) continue;
         if(page2pa(&pages[i]) >= EXTPHYSMEM && (char*)page2kva(&pages[i])<kernelUsed) continue;
-        //cprintf("go\n");
 		pages[i].pp_ref = 0;
 		pages[i].pp_link = page_free_list;
 		page_free_list = &pages[i];
