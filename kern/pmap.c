@@ -152,6 +152,7 @@ mem_init(void)
 
 	// Permissions: kernel R, user R
 	kern_pgdir[PDX(UVPT)] = PADDR(kern_pgdir) | PTE_U | PTE_P;
+	//kern_pgdir[PDX(VPT)] = PADDR(kern_pgdir) | PTE_P|PTE_W;
 
 	//////////////////////////////////////////////////////////////////////
 	// Allocate an array of npages 'struct Page's and store it in 'pages'.
@@ -251,7 +252,6 @@ mem_init(void)
     boot_map_region(kern_pgdir,KERNBASE,~0-KERNBASE+1,0,PTE_P|PTE_W);
 	// Check that the initial page directory has been set up correctly.
 	check_kern_pgdir();
-
     //panic("wgg\n");
 	// Switch from the minimal entry page directory to the full kern_pgdir
 	// page table we just created.	Our instruction pointer should be
