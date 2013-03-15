@@ -683,7 +683,28 @@ int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
 	// LAB 3: Your code here.
-
+    pde_t *pgdir = env->env_pgdir; 
+	pte_t *p;
+    perm = perm|PTE_P;
+    uint32_t old = (uint32_t)va;
+    uint32_t st = (uint32_t)va;
+    uint32_t ed = (uint32_t)ROUNDUP(va+len,PGSIZE);
+    while(st < ed)
+    {
+        pgdir = &pgdir[PDX(st)];
+        if (!(*pgdir & perm)||st>=ULIM)
+        {
+            user_mem_check_addr = (old==st?old:((st>>PTXSHIFT)<<PTXSHIFT));
+            return -E_FAULT;
+        }
+        p = (pte_t*) KADDR(PTE_ADDR(*pgdir));
+        if (!(p[PTX(st)] & perm)||st>=ULIM)
+        {
+            user_mem_check_addr = (old==st?old:((st>>PTXSHIFT)<<PTXSHIFT));
+            return -E_FAULT;
+        }
+        st += PGSIZE;
+    }
 	return 0;
 }
 

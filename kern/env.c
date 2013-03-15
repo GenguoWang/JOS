@@ -196,15 +196,15 @@ env_setup_vm(struct Env *e)
 	//t_pgdir[PDX(VPT)] = PADDR(t_pgdir) | PTE_P|PTE_W;
 
     //boot_map_region(t_pgdir,UPAGES,PTSIZE,PADDR(pages),PTE_U|PTE_P);
-	e->env_pgdir[PDX(UPAGES)] = kern_pgdir[PDX(UPAGES)];
+	//e->env_pgdir[PDX(UPAGES)] = kern_pgdir[PDX(UPAGES)];
     //boot_map_region(t_pgdir,UENVS,sizeof(struct Env)*NENV,PADDR(envs),PTE_U|PTE_P);
-	e->env_pgdir[PDX(UENVS)] = kern_pgdir[PDX(UENVS)];
+	//e->env_pgdir[PDX(UENVS)] = kern_pgdir[PDX(UENVS)];
     //boot_map_region(t_pgdir,KSTACKTOP-KSTKSIZE,KSTKSIZE,PADDR(bootstack),PTE_P|PTE_W);
-	e->env_pgdir[PDX(KSTACKTOP-KSTKSIZE)] = kern_pgdir[PDX(KSTACKTOP-KSTKSIZE)];
+	//e->env_pgdir[PDX(KSTACKTOP-KSTKSIZE)] = kern_pgdir[PDX(KSTACKTOP-KSTKSIZE)];
     unsigned int t = 0;
-    while(t<(~0-KERNBASE+1))
+    while(t<(~0-UTOP+1))
     {
-        e->env_pgdir[PDX(KERNBASE+t)] = kern_pgdir[PDX(KERNBASE+t)];
+        e->env_pgdir[PDX(UTOP+t)] = kern_pgdir[PDX(UTOP+t)];
         t += PTSIZE;
     }
     //boot_map_region(kern_pgdir,KERNBASE,~0-KERNBASE+1,0,PTE_P|PTE_W);
@@ -625,7 +625,10 @@ check_env_pgdir(pde_t * dir)
 	// check envs array (new test for lab 3)
 	n = ROUNDUP(NENV*sizeof(struct Env), PGSIZE);
 	for (i = 0; i < n; i += PGSIZE)
+    {
+        cprintf("envs: %x\n",UENVS+i);
 		assert(check_va2pa(pgdir, UENVS + i) == PADDR(envs) + i);
+    }
 
 	// check phys mem
 	for (i = 0; i < npages * PGSIZE; i += PGSIZE)
@@ -637,14 +640,16 @@ check_env_pgdir(pde_t * dir)
 	assert(check_va2pa(pgdir, KSTACKTOP - PTSIZE) == ~0);
 
 	// check PDE permissions
-    cprintf("pgdir %x",pgdir);
-    cprintf("gpdir 0 %x",pgdir[0]);
+    cprintf("pgdir %x\n",pgdir);
+    cprintf("gpdir 0 %x\n",pgdir[0]);
+    cprintf("env addr %x\n",check_va2pa(pgdir,0xeec60048));
 	for (i = 0; i < NPDENTRIES; i++) {
 		switch (i) {
 		case PDX(UVPT):
 		case PDX(KSTACKTOP-1):
 		case PDX(UPAGES):
 		case PDX(UENVS):
+            //cprintf("")
 			assert(pgdir[i] & PTE_P);
 			break;
 		default:
