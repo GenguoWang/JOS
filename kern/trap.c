@@ -25,6 +25,8 @@ static struct Trapframe *last_tf;
 /* Interrupt descriptor table.  (Must be built at run time because
  * shifted function addresses can't be represented in relocation records.)
  */
+extern unsigned int vectors[];  
+extern void sysenter_handler();
 struct Gatedesc idt[256] = { { 0 } };
 struct Pseudodesc idt_pd = {
 	sizeof(idt) - 1, (uint32_t) idt
@@ -73,6 +75,20 @@ trap_init(void)
 
 	// LAB 3: Your code here.
 
+    int i;
+
+    for(i = 0; i < 256; i++)
+        SETGATE(idt[i], 0, GD_KT, vectors[i], 0);
+    SETGATE(idt[T_SYSCALL], 1, GD_KT, vectors[T_SYSCALL], 3);
+    SETGATE(idt[T_BRKPT], 1, GD_KT, vectors[T_BRKPT], 3);
+    //init system call
+    cprintf("sysenter_hander %x\n",sysenter_handler);
+    cprintf("kstop %x\n",KSTACKTOP);
+    cprintf("vecotrs[0] %x\n",vectors[0]);
+    cprintf("vecotrs %x\n",vectors);
+    wrmsr(0x174,GD_KT,0);
+    wrmsr(0x175,KSTACKTOP,0);
+    wrmsr(0x176,sysenter_handler,0);
 	// Per-CPU setup 
 	trap_init_percpu();
 }
@@ -189,6 +205,17 @@ trap_dispatch(struct Trapframe *tf)
 
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
+    switch(tf->tf_trapno)
+    {
+        case T_PGFLT:
+            page_fault_handler(tf);
+            break;
+        case T_BRKPT:
+                while(1)
+                    monitor(NULL);
+            break;
+    }
+	// Unexpected trap: The user process or the kernel has a bug.
 	if (tf->tf_cs == GD_KT)
 		panic("unhandled trap in kernel");
 	else {
@@ -264,6 +291,10 @@ page_fault_handler(struct Trapframe *tf)
 	// Handle kernel-mode page faults.
 
 	// LAB 3: Your code here.
+	if ((tf->tf_cs & 3) != 3)
+    {
+        panic("kernel page fault!");
+    }
 
 	// We've already handled kernel-mode exceptions, so if we get here,
 	// the page fault happened in user mode.

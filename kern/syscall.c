@@ -22,7 +22,7 @@ sys_cputs(const char *s, size_t len)
 	// Destroy the environment if not.
 
 	// LAB 3: Your code here.
-
+    user_mem_assert(curenv,s,len,PTE_U);
 	// Print the string supplied by the user.
 	cprintf("%.*s", len, s);
 }
@@ -66,11 +66,14 @@ sys_env_destroy(envid_t envid)
 static int
 sys_map_kernel_page(void* kpage, void* va)
 {
+	cprintf("map %x %x\n",kpage,va);
 	int r;
 	struct Page* p = pa2page(PADDR(kpage));
-	if(p ==NULL)
-		return E_INVAL;
+	cprintf("map p %x\n",p);
+	if(p == NULL)
+		return -E_INVAL;
 	r = page_insert(curenv->env_pgdir, p, va, PTE_U | PTE_W);
+	cprintf("map r %x\n",r);
 	return r;
 }
 
@@ -281,7 +284,32 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	// Call the function corresponding to the 'syscallno' parameter.
 	// Return any appropriate return value.
 	// LAB 3: Your code here.
-
-	panic("syscall not implemented");
+    int32_t res;
+    switch(syscallno)
+    {
+        case SYS_cputs:
+            sys_cputs((const char*)a1,(size_t)a2);
+            res = 0;
+            break;
+        case SYS_cgetc:
+            res = sys_cgetc();
+            break;
+        case SYS_getenvid:
+            res = sys_getenvid();
+            break;
+        case SYS_env_destroy:
+            res = sys_env_destroy(a1);
+            break;
+        case SYS_map_kernel_page:
+            
+            res = sys_map_kernel_page((void*)a1,(void*)a2);
+            break;
+        case NSYSCALLS:
+        default:
+            res = -E_INVAL;
+    }
+	//panic("syscall not implemented");
+    
+    return res;
 }
 
