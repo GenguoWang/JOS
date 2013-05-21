@@ -19,6 +19,8 @@ static struct Env *env_free_list;	// Free environment list
 
 #define ENVGENSHIFT	12		// >= LOGNENV
 
+static void
+check_env_pgdir(pde_t * dir);
 // Global descriptor table.
 //
 // Set up global descriptor table (GDT) with separate segments for
@@ -116,6 +118,14 @@ env_init(void)
 {
 	// Set up envs array
 	// LAB 3: Your code here.
+   env_free_list = envs; 
+    int i=0;
+    for(i=0;i<NENV;++i)   
+    {
+        if(i!=NENV-1)envs[i].env_link = &(envs[i+1]);
+        else envs[i].env_link = NULL;
+        envs[i].env_status = ENV_FREE;
+    }
 
 	// Per-CPU part of the initialization
 	env_init_percpu();
@@ -179,9 +189,28 @@ env_setup_vm(struct Env *e)
 	//    - The functions in kern/pmap.h are handy.
 
 	// LAB 3: Your code here.
+    p->pp_ref++;
+    e->env_pgdir = page2kva(p);
+    cprintf("setup env pgdir %x\n",e->env_pgdir);
+    //pde_t* t_pgdir = e->env_pgdir;
+	//t_pgdir[PDX(VPT)] = PADDR(t_pgdir) | PTE_P|PTE_W;
 
-	// UVPT maps the env's own page table read-only.
-	// Permissions: kernel R, user R
+    //boot_map_region(t_pgdir,UPAGES,PTSIZE,PADDR(pages),PTE_U|PTE_P);
+	e->env_pgdir[PDX(UPAGES)] = kern_pgdir[PDX(UPAGES)];
+    //boot_map_region(t_pgdir,UENVS,sizeof(struct Env)*NENV,PADDR(envs),PTE_U|PTE_P);
+	e->env_pgdir[PDX(UENVS)] = kern_pgdir[PDX(UENVS)];
+    //boot_map_region(t_pgdir,KSTACKTOP-KSTKSIZE,KSTKSIZE,PADDR(bootstack),PTE_P|PTE_W);
+	e->env_pgdir[PDX(KSTACKTOP-KSTKSIZE)] = kern_pgdir[PDX(KSTACKTOP-KSTKSIZE)];
+    unsigned int t = 0;
+    while(t<(~0-KERNBASE+1))
+    {
+        e->env_pgdir[PDX(KERNBASE+t)] = kern_pgdir[PDX(KERNBASE+t)];
+        t += PTSIZE;
+    }
+    //boot_map_region(kern_pgdir,KERNBASE,~0-KERNBASE+1,0,PTE_P|PTE_W);
+    //a little trick, make UVPT point to Page Tables
+    //if use boot_map_region(UVPT,PADDR(e->env_pgdir)) not work
+    //will error: UVPT point to Page Directory
 	e->env_pgdir[PDX(UVPT)] = PADDR(e->env_pgdir) | PTE_P | PTE_U;
 
 	return 0;
@@ -267,6 +296,25 @@ region_alloc(struct Env *e, void *va, size_t len)
 	//   'va' and 'len' values that are not page-aligned.
 	//   You should round va down, and round (va + len) up.
 	//   (Watch out for corner-cases!)
+    void *st = ROUNDDOWN(va,PGSIZE);
+    void *ed = ROUNDUP(va+len,PGSIZE);
+    cprintf("region_alloc st:%x,ed%x\n",st,ed);
+    struct Page * p;
+    int res;
+    while(st < ed)
+    {
+        if(!(p=page_alloc(0)))
+        {
+            panic("region_alloc Not Enough Memory");
+        }
+        cprintf("page pa %x\n",page2pa(p));
+        res = page_insert(e->env_pgdir,p,st,PTE_P|PTE_W|PTE_U);
+        if(res!=0)
+        {
+            panic("region_alloc: %e",res);
+        }
+        st += PGSIZE;
+    }
 }
 
 //
@@ -291,9 +339,70 @@ region_alloc(struct Env *e, void *va, size_t len)
 // load_icode panics if it encounters problems.
 //  - How might load_icode fail?  What might be wrong with the given input?
 //
+
+static physaddr_t
+check_va2kva(pde_t *pgdir, uintptr_t va)
+{
+	pte_t *p;
+
+	pgdir = &pgdir[PDX(va)];
+    //cprintf("va2pa begin %x\n",va);
+	if (!(*pgdir & PTE_P))
+        return ~0;
+	p = (pte_t*) KADDR(PTE_ADDR(*pgdir));
+	if (!(p[PTX(va)] & PTE_P))
+		return ~0;
+    //cprintf("va2pa end %x\n",va);
+    //cprintf("va2pa res %x\n",KADDR(PTE_ADDR(p[PTX(va)])));
+	return (physaddr_t)KADDR(PTE_ADDR(p[PTX(va)])+PGOFF(va));
+}
+
 static void
 load_icode(struct Env *e, uint8_t *binary, size_t size)
 {
+    cprintf("wgg:load_icode\n");
+    cprintf("1c\n");
+    check_env_pgdir(e->env_pgdir);
+	struct Proghdr *ph, *eph;
+    struct Elf * ELFHDR = (struct Elf*)binary;
+	if (ELFHDR->e_magic != ELF_MAGIC)
+    {
+        panic("load_iocde:Error elf");
+        
+    }
+    
+	// load each program segment (ignores ph flags)
+	ph = (struct Proghdr *) ((uint8_t *) ELFHDR + ELFHDR->e_phoff);
+	eph = ph + ELFHDR->e_phnum;
+    int i=0;
+    physaddr_t test;
+    uint8_t *arr;
+	for (; ph < eph; ph++)
+    {
+        if(ph->p_type == ELF_PROG_LOAD)
+        {
+            region_alloc(e,(void*)ph->p_va,ph->p_memsz);
+            for(i=0;i<ph->p_memsz;++i)
+            {
+                arr =  ((uint8_t *)check_va2kva(e->env_pgdir,(uintptr_t)(ph->p_va+i)));
+                if(i<ph->p_filesz)
+                {
+                    *arr = *(binary+ph->p_offset+i);
+                }
+                else
+                {
+                    
+                    *arr = 0;
+                }
+
+            }
+        }
+    }
+
+	// call the entry point from the ELF header
+	// note: does not return!
+	//((void (*)(void)) (ELFHDR->e_entry))();
+    e->env_tf.tf_eip = ELFHDR->e_entry;
 	// Hints:
 	//  Load each program segment into virtual memory
 	//  at the address specified in the ELF section header.
@@ -328,6 +437,7 @@ load_icode(struct Env *e, uint8_t *binary, size_t size)
 	// at virtual address USTACKTOP - PGSIZE.
 
 	// LAB 3: Your code here.
+    region_alloc(e,(void*)(USTACKTOP-PGSIZE),PGSIZE);
 }
 
 //
@@ -341,6 +451,18 @@ void
 env_create(uint8_t *binary, size_t size, enum EnvType type)
 {
 	// LAB 3: Your code here.
+    int res;
+    struct Env * e;
+    res = env_alloc(&e,0);
+    check_env_pgdir(e->env_pgdir);
+    if(res != 0)
+    {
+        panic("env_create: %e",res);
+    }
+    //panic("bc");
+    load_icode(e,binary,size);
+    //panic("ac");
+    e->env_type = type;
 }
 
 //
@@ -456,7 +578,91 @@ env_run(struct Env *e)
 	//	e->env_tf to sensible values.
 
 	// LAB 3: Your code here.
-
-	panic("env_run not yet implemented");
+    //panic("run");
+    cprintf("wgg run\n");
+    if(curenv!=NULL)
+    {
+        if(curenv->env_status == ENV_RUNNING) curenv->env_status = ENV_RUNNABLE;
+    }
+    curenv = e;
+    curenv->env_status = ENV_RUNNING;
+    curenv->env_runs++;
+    cprintf("run pgdir %x\n",curenv->env_pgdir);
+    lcr3(PADDR(curenv->env_pgdir));
+    env_pop_tf(&(curenv->env_tf));
+    cprintf("wgg end\n"); 
+	//panic("env_run not yet implemented");
 }
 
+static physaddr_t
+check_va2pa(pde_t *pgdir, uintptr_t va)
+{
+	pte_t *p;
+
+	pgdir = &pgdir[PDX(va)];
+	if (!(*pgdir & PTE_P))
+		return ~0;
+	p = (pte_t*) KADDR(PTE_ADDR(*pgdir));
+	if (!(p[PTX(va)] & PTE_P))
+		return ~0;
+	return PTE_ADDR(p[PTX(va)]);
+}
+
+
+static void
+check_env_pgdir(pde_t * dir)
+{
+	uint32_t i, n;
+	pde_t *pgdir;
+
+	pgdir = dir;
+
+	// check pages array
+	n = ROUNDUP(npages*sizeof(struct Page), PGSIZE);
+	for (i = 0; i < n; i += PGSIZE)
+		assert(check_va2pa(pgdir, UPAGES + i) == PADDR(pages) + i);
+
+	// check envs array (new test for lab 3)
+	n = ROUNDUP(NENV*sizeof(struct Env), PGSIZE);
+	for (i = 0; i < n; i += PGSIZE)
+    {
+        cprintf("envs: %x\n",UENVS+i);
+		assert(check_va2pa(pgdir, UENVS + i) == PADDR(envs) + i);
+    }
+
+	// check phys mem
+	for (i = 0; i < npages * PGSIZE; i += PGSIZE)
+		assert(check_va2pa(pgdir, KERNBASE + i) == i);
+
+	// check kernel stack
+	for (i = 0; i < KSTKSIZE; i += PGSIZE)
+		assert(check_va2pa(pgdir, KSTACKTOP - KSTKSIZE + i) == PADDR(bootstack) + i);
+	assert(check_va2pa(pgdir, KSTACKTOP - PTSIZE) == ~0);
+
+	// check PDE permissions
+    cprintf("pgdir %x\n",pgdir);
+    cprintf("gpdir 0 %x\n",pgdir[0]);
+    cprintf("env addr %x\n",check_va2pa(pgdir,0xeec60048));
+	for (i = 0; i < NPDENTRIES; i++) {
+		switch (i) {
+		case PDX(UVPT):
+		case PDX(KSTACKTOP-1):
+		case PDX(UPAGES):
+		case PDX(UENVS):
+            //cprintf("")
+			assert(pgdir[i] & PTE_P);
+			break;
+		default:
+			if (i >= PDX(KERNBASE)) {
+				assert(pgdir[i] & PTE_P);
+				assert(pgdir[i] & PTE_W);
+			} else
+            {
+                //cprintf("i %d\n",i);
+				assert(pgdir[i] == 0);
+            }
+			break;
+		}
+	}
+	cprintf("check_env_pgdir() succeeded!\n");
+}

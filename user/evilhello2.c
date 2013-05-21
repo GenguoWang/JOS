@@ -5,8 +5,10 @@
 #include <inc/mmu.h>
 #include <inc/x86.h>
 
-
+struct Gatedesc *buf;
+struct Gatedesc old;
 // Call this function with ring0 privilege
+
 void evil()
 {
 	// Kernel memory access
@@ -32,7 +34,13 @@ sgdt(struct Pseudodesc* gdtd)
 {
 	__asm __volatile("sgdt %0" :  "=m" (*gdtd));
 }
-
+static void wrapper()
+{
+    evil();
+    buf[4] = old;
+    asm volatile("popl %ebp");
+    asm volatile("lret");
+}
 // Invoke a given function pointer with ring0 privilege, then return to ring3
 void ring0_call(void (*fun_ptr)(void)) {
     // Here's some hints on how to achieve this.
@@ -49,6 +57,24 @@ void ring0_call(void (*fun_ptr)(void)) {
     //        file if necessary.
 
     // Lab3 : Your Code Here
+    struct Pseudodesc gdtd;
+    sgdt(&gdtd);
+    cprintf("base %x,limit %x\n",gdtd.pd_base,gdtd.pd_lim);
+    void *va = (void*)0x400000;
+	//sys_map_kernel_page((void*)gdtd.pd_base,buf);
+    if(sys_map_kernel_page((void*)gdtd.pd_base,va)!=0)
+    {
+        cprintf("error map\n");
+    }
+    else
+    {
+        cprintf("map success\n");
+    }
+    buf = (struct Gatedesc *)(va+PGOFF(gdtd.pd_base));
+    old = buf[4];
+    SETCALLGATE(buf[4],GD_KT,wrapper,3);
+    asm volatile("lcall $0x20,$0");
+    cprintf("here\n");
 }
 
 void
