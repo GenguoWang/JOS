@@ -289,8 +289,9 @@ trap(struct Trapframe *tf)
 		// The trapframe on the stack should be ignored from here on.
 		tf = &curenv->env_tf;
 	}
-    else if(tf->tf_trapno == IRQ_OFFSET+IRQ_TIMER)
+    else if(tf->tf_trapno >= IRQ_OFFSET && tf->tf_trapno < IRQ_OFFSET+16)
     {
+        //if use sysexit, may have IRQ in kernel mode, tricky
         lock_kernel();
     }
 

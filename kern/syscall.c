@@ -371,7 +371,8 @@ syscall_wrapper(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint3
     curenv->env_tf.tf_esp = aesp;
     res = syscall(syscallno,a1,a2,a3,a4,a5);
     curenv->env_tf.tf_regs.reg_eax = res;
-    //env_run(curenv);
+    //env_run!use iret to restore eflags(IF)
+    env_run(curenv);
     unlock_kernel();
     //panic("syscall wrapper error!");
     return res;
