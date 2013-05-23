@@ -369,10 +369,11 @@ syscall_wrapper(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint3
     lock_kernel();
     curenv->env_tf.tf_eip = aeip;
     curenv->env_tf.tf_esp = aesp;
-    curenv->env_tf.tf_regs.reg_eax = syscall(syscallno,a1,a2,a3,a4,a5);
-    env_run(curenv);
-    //unlock_kernel();
-    panic("syscall wrapper error!");
+    res = syscall(syscallno,a1,a2,a3,a4,a5);
+    curenv->env_tf.tf_regs.reg_eax = res;
+    //env_run(curenv);
+    unlock_kernel();
+    //panic("syscall wrapper error!");
     return res;
 }
 // Dispatches to the correct kernel function, passing the arguments.

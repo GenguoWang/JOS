@@ -289,6 +289,10 @@ trap(struct Trapframe *tf)
 		// The trapframe on the stack should be ignored from here on.
 		tf = &curenv->env_tf;
 	}
+    else if(tf->tf_trapno == IRQ_OFFSET+IRQ_TIMER)
+    {
+        lock_kernel();
+    }
 
 	// Record that tf is the last real trapframe so
 	// print_trapframe can print some additional information.
