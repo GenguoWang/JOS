@@ -5,7 +5,7 @@
 #include <inc/lib.h>
 
 envid_t dumbfork(void);
-
+void extr(envid_t);
 void
 umain(int argc, char **argv)
 {
@@ -14,7 +14,13 @@ umain(int argc, char **argv)
 
 	// fork a child process
 	who = dumbfork();
-
+    /*
+    if(who>0)
+    {
+        int bb =100;
+        extr(who);
+        cprintf("pp who%x\n",who);
+    }*/
 	// print a message and yield to the other a few times
 	for (i = 0; i < (who ? 10 : 20); i++) {
 		cprintf("%d: I am the %s!\n", i, who ? "parent" : "child");
@@ -36,7 +42,27 @@ duppage(envid_t dstenv, void *addr)
 	if ((r = sys_page_unmap(0, UTEMP)) < 0)
 		panic("sys_page_unmap: %e", r);
 }
+void 
+extr(envid_t envid)
+{
+    
+	uint8_t *addr;
+	int r;
+	extern unsigned char end[];
+	for (addr = (uint8_t*) UTEXT; addr < end; addr += PGSIZE)
+		duppage(envid, addr);
 
+	// Also copy the stack we are currently running on.
+	duppage(envid, ROUNDDOWN(&addr, PGSIZE));
+
+	// Start the child environment running
+	if ((r = sys_env_set_status(envid, ENV_RUNNABLE)) < 0)
+		panic("sys_env_set_status: %e", r);
+}
+envid_t sss()
+{
+    return sys_exofork();
+}
 envid_t
 dumbfork(void)
 {
@@ -51,6 +77,7 @@ dumbfork(void)
 	// except that in the child, this "fake" call to sys_exofork()
 	// will return 0 instead of the envid of the child.
 	envid = sys_exofork();
+    //envid = sss();
 	if (envid < 0)
 		panic("sys_exofork: %e", envid);
 	if (envid == 0) {

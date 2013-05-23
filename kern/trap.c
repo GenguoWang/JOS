@@ -217,15 +217,16 @@ trap_dispatch(struct Trapframe *tf)
                 return;
             }
             break;
+        case T_PGFLT:
+            page_fault_handler(tf);
+            return;
+            break;
     }
 
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
     switch(tf->tf_trapno)
     {
-        case T_PGFLT:
-            page_fault_handler(tf);
-            break;
         case T_BRKPT:
                 while(1)
                     monitor(NULL);
@@ -345,7 +346,37 @@ page_fault_handler(struct Trapframe *tf)
 	//   (the 'tf' variable points at 'curenv->env_tf').
 
 	// LAB 4: Your code here.
-
+    uint32_t cesp = tf->tf_esp;
+    size_t len = 56;
+    if(cesp<UXSTACKTOP-PGSIZE||cesp>UXSTACKTOP-1)
+    {
+        cesp = UXSTACKTOP;
+    }
+    uint32_t * p = (uint32_t*) cesp;
+    if(curenv->env_pgfault_upcall ==NULL)
+    {
+        //cprintf("user fault va\n");
+    }
+    else //if(
+        //(uint32_t)(p-14)>=UXSTACKTOP-PGSIZE)
+    {
+        //cprintf("check %x %x\n",UXSTACKTOP,UXSTACKTOP-PGSIZE);
+        user_mem_assert(curenv,(void*)(cesp-len),len,PTE_U|PTE_W|PTE_P);
+        user_mem_assert(curenv,curenv->env_pgfault_upcall,4,PTE_U|PTE_P);
+        //*--p = 0;
+        --p;
+        *--p = tf->tf_esp;//for ret address
+        *--p = tf->tf_eflags;
+        *--p = tf->tf_eip;
+        p = p-8;
+        *(struct PushRegs*)p = tf->tf_regs;
+        *--p = tf->tf_err;
+        *--p = fault_va;
+        tf->tf_esp = (uint32_t)p;
+        tf->tf_eip = (uint32_t)curenv->env_pgfault_upcall;
+        env_run(curenv);
+    }
+    
 	// Destroy the environment that caused the fault.
 	cprintf("[%08x] user fault va %08x ip %08x\n",
 		curenv->env_id, fault_va, tf->tf_eip);

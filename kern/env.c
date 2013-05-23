@@ -615,7 +615,7 @@ env_run(struct Env *e)
     curenv = e;
     curenv->env_status = ENV_RUNNING;
     curenv->env_runs++;
-    //cprintf("wgg cpu %d runned %x\n",cpunum(),e->env_id);
+    cprintf("wgg cpu %d runned %x eip %x\n",cpunum(),e->env_id,e->env_tf.tf_eip);
     //cprintf("run pgdir %x\n",curenv->env_pgdir);
     unlock_kernel();
     lcr3(PADDR(curenv->env_pgdir));
