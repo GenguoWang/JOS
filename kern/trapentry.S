@@ -578,7 +578,7 @@ sysenter_handler:
     pushl %ecx
     pushl %edx
     pushl %eax 
-    call syscall
+    call syscall_wrapper
     popl %ebx
     popl %ebx
     popl %ebx

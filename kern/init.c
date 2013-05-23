@@ -59,24 +59,31 @@ i386_init(void)
 
 	// Acquire the big kernel lock before waking up APs
 	// Your code here:
+    lock_kernel();
 
 	// Starting non-boot CPUs
 	boot_aps();
 
 	// Should always have idle processes at first.
+    cprintf("begin create\n");
 	int i;
 	for (i = 0; i < NCPU; i++)
 		ENV_CREATE(user_idle, ENV_TYPE_IDLE);
-
+    cprintf("end create\n");
 #if defined(TEST)
 	// Don't touch -- used by grading script!
 	ENV_CREATE(TEST, ENV_TYPE_USER);
 #else
 	// Touch all you want.
-	ENV_CREATE(user_primes, ENV_TYPE_USER);
+	ENV_CREATE(user_dumbfork, ENV_TYPE_USER);
+	//ENV_CREATE(user_yield, ENV_TYPE_USER);
+	//ENV_CREATE(user_yield, ENV_TYPE_USER);
+	//ENV_CREATE(user_primes, ENV_TYPE_USER);
 #endif // TEST*
 
 	// Schedule and run the first user environment!
+    //unlock_kernel();
+    //for(;;);
 	sched_yield();
 }
 
@@ -132,7 +139,13 @@ mp_main(void)
 	// Your code here:
 
 	// Remove this after you finish Exercise 4
-	for (;;);
+    //for(;;);
+    //if(cpunum()!=1)
+    //{
+    //    for(;;);
+    //}
+    lock_kernel();
+    sched_yield();
 }
 
 /*

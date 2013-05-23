@@ -228,8 +228,7 @@ mem_init(void)
         bbase+=PGSIZE;
         ksize-=PGSIZE;
     }*/
-    boot_map_region(kern_pgdir,KSTACKTOP-KSTKSIZE,KSTKSIZE,PADDR(bootstack),PTE_P|PTE_W);
-    boot_map_region(kern_pgdir,KERNBASE,~0-KERNBASE+1,0,PTE_P|PTE_W);
+    //boot_map_region(kern_pgdir,KSTACKTOP-KSTKSIZE,KSTKSIZE,PADDR(bootstack),PTE_P|PTE_W);
     //boot_map_region(kern_pgdir,KSTACKTOP-PTSIZE,PTSIZE-KSTKSIZE,~0,PTE_P);
 	//////////////////////////////////////////////////////////////////////
 	// Map all of physical memory at KERNBASE.
@@ -239,6 +238,7 @@ mem_init(void)
 	// we just set up the mapping anyway.
 	// Permissions: kernel RW, user NONE
 	// Your code goes here:
+    boot_map_region(kern_pgdir,KERNBASE,~0-KERNBASE+1,0,PTE_P|PTE_W);
 
 	// Initialize the SMP-related parts of the memory map
 	mem_init_mp();
@@ -291,7 +291,7 @@ mem_init_mp(void)
 {
 	// Create a direct mapping at the top of virtual address space starting
 	// at IOMEMBASE for accessing the LAPIC unit using memory-mapped I/O.
-	boot_map_region(kern_pgdir, IOMEMBASE, -IOMEMBASE, IOMEM_PADDR, PTE_W);
+	boot_map_region(kern_pgdir, IOMEMBASE, -IOMEMBASE, IOMEM_PADDR, PTE_P|PTE_W);
 
 	// Map per-CPU stacks starting at KSTACKTOP, for up to 'NCPU' CPUs.
 	//
@@ -309,7 +309,13 @@ mem_init_mp(void)
 	//     Permissions: kernel RW, user NONE
 	//
 	// LAB 4: Your code here:
-
+    int i = 0;
+    for(i = 0; i < NCPU; ++i)
+    {
+        uint32_t addr = KSTACKTOP - i*(KSTKSIZE+KSTKGAP);
+        addr -= KSTKSIZE;
+        boot_map_region(kern_pgdir,addr,KSTKSIZE,PADDR(percpu_kstacks[i]),PTE_P|PTE_W);
+    }
 }
 
 // --------------------------------------------------------------
@@ -354,6 +360,7 @@ page_init(void)
         if(i == 0) break;//size_t is no sign mean never less than 0,if use continue, very worse
         if(page2pa(&pages[i])>=IOPHYSMEM && page2pa(&pages[i]) <EXTPHYSMEM) continue;
         if(page2pa(&pages[i]) >= EXTPHYSMEM && (char*)page2kva(&pages[i])<kernelUsed) continue;
+        if(page2pa(&pages[i]) >= MPENTRY_PADDR && page2pa(&pages[i])<MPENTRY_PADDR+PGSIZE) continue;
 		pages[i].pp_ref = 0;
 		pages[i].pp_link = page_free_list;
 		page_free_list = &pages[i];

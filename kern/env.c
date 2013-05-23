@@ -194,20 +194,20 @@ env_setup_vm(struct Env *e)
 	// LAB 3: Your code here.
     p->pp_ref++;
     e->env_pgdir = page2kva(p);
-    cprintf("setup env pgdir %x\n",e->env_pgdir);
+    //cprintf("setup env pgdir %x\n",e->env_pgdir);
     //pde_t* t_pgdir = e->env_pgdir;
 	//t_pgdir[PDX(VPT)] = PADDR(t_pgdir) | PTE_P|PTE_W;
 
     //boot_map_region(t_pgdir,UPAGES,PTSIZE,PADDR(pages),PTE_U|PTE_P);
-	e->env_pgdir[PDX(UPAGES)] = kern_pgdir[PDX(UPAGES)];
+	//e->env_pgdir[PDX(UPAGES)] = kern_pgdir[PDX(UPAGES)];
     //boot_map_region(t_pgdir,UENVS,sizeof(struct Env)*NENV,PADDR(envs),PTE_U|PTE_P);
-	e->env_pgdir[PDX(UENVS)] = kern_pgdir[PDX(UENVS)];
+	//e->env_pgdir[PDX(UENVS)] = kern_pgdir[PDX(UENVS)];
     //boot_map_region(t_pgdir,KSTACKTOP-KSTKSIZE,KSTKSIZE,PADDR(bootstack),PTE_P|PTE_W);
-	e->env_pgdir[PDX(KSTACKTOP-KSTKSIZE)] = kern_pgdir[PDX(KSTACKTOP-KSTKSIZE)];
+	//e->env_pgdir[PDX(KSTACKTOP-KSTKSIZE)] = kern_pgdir[PDX(KSTACKTOP-KSTKSIZE)];
     unsigned int t = 0;
-    while(t<(~0-KERNBASE+1))
+    while(t<(~0-UTOP+1))
     {
-        e->env_pgdir[PDX(KERNBASE+t)] = kern_pgdir[PDX(KERNBASE+t)];
+        e->env_pgdir[PDX(UTOP+t)] = kern_pgdir[PDX(UTOP+t)];
         t += PTSIZE;
     }
     //boot_map_region(kern_pgdir,KERNBASE,~0-KERNBASE+1,0,PTE_P|PTE_W);
@@ -310,7 +310,7 @@ region_alloc(struct Env *e, void *va, size_t len)
 	//   (Watch out for corner-cases!)
     void *st = ROUNDDOWN(va,PGSIZE);
     void *ed = ROUNDUP(va+len,PGSIZE);
-    cprintf("region_alloc st:%x,ed%x\n",st,ed);
+    //cprintf("region_alloc st:%x,ed%x\n",st,ed);
     struct Page * p;
     int res;
     while(st < ed)
@@ -319,7 +319,7 @@ region_alloc(struct Env *e, void *va, size_t len)
         {
             panic("region_alloc Not Enough Memory");
         }
-        cprintf("page pa %x\n",page2pa(p));
+        //cprintf("page pa %x\n",page2pa(p));
         res = page_insert(e->env_pgdir,p,st,PTE_P|PTE_W|PTE_U);
         if(res!=0)
         {
@@ -372,9 +372,9 @@ check_va2kva(pde_t *pgdir, uintptr_t va)
 static void
 load_icode(struct Env *e, uint8_t *binary, size_t size)
 {
-    cprintf("wgg:load_icode\n");
-    cprintf("1c\n");
-    check_env_pgdir(e->env_pgdir);
+    //cprintf("wgg:load_icode\n");
+    //cprintf("1c\n");
+    //check_env_pgdir(e->env_pgdir);
 	struct Proghdr *ph, *eph;
     struct Elf * ELFHDR = (struct Elf*)binary;
 	if (ELFHDR->e_magic != ELF_MAGIC)
@@ -466,7 +466,7 @@ env_create(uint8_t *binary, size_t size, enum EnvType type)
     int res;
     struct Env * e;
     res = env_alloc(&e,0);
-    check_env_pgdir(e->env_pgdir);
+    //check_env_pgdir(e->env_pgdir);
     if(res != 0)
     {
         panic("env_create: %e",res);
@@ -605,18 +605,22 @@ env_run(struct Env *e)
 
 	// LAB 3: Your code here.
     //panic("run");
-    cprintf("wgg run\n");
+    //cprintf("wgg cpu %d run %x\n",cpunum(),e->env_id);
+    //struct Env * cur = thiscpu->cpu_env;
     if(curenv!=NULL)
     {
         if(curenv->env_status == ENV_RUNNING) curenv->env_status = ENV_RUNNABLE;
     }
+    //thiscpu->cpu_env = e;
     curenv = e;
     curenv->env_status = ENV_RUNNING;
     curenv->env_runs++;
-    cprintf("run pgdir %x\n",curenv->env_pgdir);
+    //cprintf("wgg cpu %d runned %x\n",cpunum(),e->env_id);
+    //cprintf("run pgdir %x\n",curenv->env_pgdir);
+    unlock_kernel();
     lcr3(PADDR(curenv->env_pgdir));
     env_pop_tf(&(curenv->env_tf));
-    cprintf("wgg end\n"); 
+    //cprintf("wgg end\n"); 
 	//panic("env_run not yet implemented");
 }
 
@@ -652,7 +656,7 @@ check_env_pgdir(pde_t * dir)
 	n = ROUNDUP(NENV*sizeof(struct Env), PGSIZE);
 	for (i = 0; i < n; i += PGSIZE)
     {
-        cprintf("envs: %x\n",UENVS+i);
+        //cprintf("envs: %x\n",UENVS+i);
 		assert(check_va2pa(pgdir, UENVS + i) == PADDR(envs) + i);
     }
 
@@ -666,7 +670,7 @@ check_env_pgdir(pde_t * dir)
 	assert(check_va2pa(pgdir, KSTACKTOP - PTSIZE) == ~0);
 
 	// check PDE permissions
-    cprintf("pgdir %x\n",pgdir);
+    //cprintf("pgdir %x\n",pgdir);
     cprintf("gpdir 0 %x\n",pgdir[0]);
     cprintf("env addr %x\n",check_va2pa(pgdir,0xeec60048));
 	for (i = 0; i < NPDENTRIES; i++) {

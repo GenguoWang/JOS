@@ -82,13 +82,10 @@ trap_init(void)
     SETGATE(idt[T_SYSCALL], 1, GD_KT, vectors[T_SYSCALL], 3);
     SETGATE(idt[T_BRKPT], 1, GD_KT, vectors[T_BRKPT], 3);
     //init system call
-    cprintf("sysenter_hander %x\n",sysenter_handler);
-    cprintf("kstop %x\n",KSTACKTOP);
-    cprintf("vecotrs[0] %x\n",vectors[0]);
-    cprintf("vecotrs %x\n",vectors);
-    wrmsr(0x174,GD_KT,0);
-    wrmsr(0x175,KSTACKTOP,0);
-    wrmsr(0x176,sysenter_handler,0);
+    //cprintf("sysenter_hander %x\n",sysenter_handler);
+    //cprintf("kstop %x\n",KSTACKTOP);
+    //cprintf("vecotrs[0] %x\n",vectors[0]);
+    //cprintf("vecotrs %x\n",vectors);
 	// Per-CPU setup 
 	trap_init_percpu();
 }
@@ -122,17 +119,26 @@ trap_init_percpu(void)
 
 	// Setup a TSS so that we get the right stack
 	// when we trap to the kernel.
-	ts.ts_esp0 = KSTACKTOP;
-	ts.ts_ss0 = GD_KD;
+    wrmsr(0x174,GD_KT,0);
+    wrmsr(0x175,percpu_kstacks[cpunum()],0);
+    wrmsr(0x176,sysenter_handler,0);
+    int i = cpunum();
+    thiscpu->cpu_ts.ts_esp0 = (uint32_t)percpu_kstacks[i];
+    thiscpu->cpu_ts.ts_ss0 = GD_KD;
+	//ts.ts_esp0 = (uint32_t)percpu_kstacks[0];
+	//ts.ts_ss0 = GD_KD;
 
 	// Initialize the TSS slot of the gdt.
-	gdt[GD_TSS0 >> 3] = SEG16(STS_T32A, (uint32_t) (&ts),
+	//gdt[GD_TSS0 >> 3] = SEG16(STS_T32A, (uint32_t) (&ts),
+	//				sizeof(struct Taskstate), 0);
+	//gdt[GD_TSS0 >> 3].sd_s = 0;
+	gdt[(GD_TSS0 >> 3)+i] = SEG16(STS_T32A, (uint32_t) (&thiscpu->cpu_ts),
 					sizeof(struct Taskstate), 0);
-	gdt[GD_TSS0 >> 3].sd_s = 0;
+	gdt[(GD_TSS0 >> 3)+i].sd_s = 0;
 
 	// Load the TSS selector (like other segment selectors, the
 	// bottom three bits are special; we leave them 0)
-	ltr(GD_TSS0);
+	ltr(GD_TSS0+(i<<3));
 
 	// Load the IDT
 	lidt(&idt_pd);
@@ -202,6 +208,16 @@ trap_dispatch(struct Trapframe *tf)
 	// Handle clock interrupts. Don't forget to acknowledge the
 	// interrupt using lapic_eoi() before calling the scheduler!
 	// LAB 4: Your code here.
+    switch(tf->tf_trapno)
+    {
+        case T_SYSCALL:
+            if(tf->tf_regs.reg_eax==SYS_exofork)
+            {
+                tf->tf_regs.reg_eax = syscall(tf->tf_regs.reg_eax,0,0,0,0,0);   
+                return;
+            }
+            break;
+    }
 
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
@@ -246,6 +262,7 @@ trap(struct Trapframe *tf)
 		// Acquire the big kernel lock before doing any
 		// serious kernel work.
 		// LAB 4: Your code here.
+        lock_kernel();
 		assert(curenv);
 
 		// Garbage collect if current enviroment is a zombie

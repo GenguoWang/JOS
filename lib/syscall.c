@@ -6,8 +6,13 @@
 static inline int32_t
 syscall(int num, int check, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5)
 {
+    if(a5!=0 && a5 <= ((~0)>>8))
+    {
+        num += (a5<<8);
+    }
 	int32_t ret;
-	asm volatile("pushl %%ecx\n\t"
+	asm volatile(//"pushal\n\t"
+         "pushl %%ecx\n\t"
 		 "pushl %%edx\n\t"
 	         "pushl %%ebx\n\t"
 		 "pushl %%esp\n\t"
@@ -33,7 +38,7 @@ syscall(int num, int check, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
                  "popl %%ebx\n\t"
                  "popl %%edx\n\t"
                  "popl %%ecx\n\t"
-                 
+                 //"popal\n\t"
                  : "=a" (ret)
                  : "a" (num),
                    "d" (a1),
