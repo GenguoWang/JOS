@@ -11,7 +11,7 @@ syscall(int num, int check, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
         num += (a5<<8);
     }
 	int32_t ret;
-	asm volatile(//"pushal\n\t"
+	asm volatile(
          "pushl %%ecx\n\t"
 		 "pushl %%edx\n\t"
 	         "pushl %%ebx\n\t"
@@ -19,6 +19,7 @@ syscall(int num, int check, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 		 "pushl %%ebp\n\t"
 		 "pushl %%esi\n\t"
 		 "pushl %%edi\n\t"
+         "pushfl\n\t"//if must be set in ring0
 				 
                  //Lab 3: Your code here
 		 "movl %1, %%eax\n\t"
@@ -31,6 +32,7 @@ syscall(int num, int check, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 		 "sysenter\n\t"
 		 "1:\n\t"
 		 "movl %%eax, %0\n\t"
+                 "popfl\n\t"
                  "popl %%edi\n\t"
                  "popl %%esi\n\t"
                  "popl %%ebp\n\t"
@@ -38,7 +40,6 @@ syscall(int num, int check, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
                  "popl %%ebx\n\t"
                  "popl %%edx\n\t"
                  "popl %%ecx\n\t"
-                 //"popal\n\t"
                  : "=a" (ret)
                  : "a" (num),
                    "d" (a1),

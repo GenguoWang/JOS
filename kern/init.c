@@ -65,17 +65,17 @@ i386_init(void)
 	boot_aps();
 
 	// Should always have idle processes at first.
-    cprintf("begin create\n");
+    //cprintf("begin create\n");
 	int i;
 	for (i = 0; i < NCPU; i++)
 		ENV_CREATE(user_idle, ENV_TYPE_IDLE);
-    cprintf("end create\n");
+    //cprintf("end create\n");
 #if defined(TEST)
 	// Don't touch -- used by grading script!
 	ENV_CREATE(TEST, ENV_TYPE_USER);
 #else
 	// Touch all you want.
-	ENV_CREATE(user_forktree, ENV_TYPE_USER);
+	ENV_CREATE(user_faultregs, ENV_TYPE_USER);
 	//ENV_CREATE(user_yield, ENV_TYPE_USER);
 	//ENV_CREATE(user_yield, ENV_TYPE_USER);
 	//ENV_CREATE(user_primes, ENV_TYPE_USER);

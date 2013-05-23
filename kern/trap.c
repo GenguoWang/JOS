@@ -79,8 +79,9 @@ trap_init(void)
 
     for(i = 0; i < 256; i++)
         SETGATE(idt[i], 0, GD_KT, vectors[i], 0);
-    SETGATE(idt[T_SYSCALL], 1, GD_KT, vectors[T_SYSCALL], 3);
-    SETGATE(idt[T_BRKPT], 1, GD_KT, vectors[T_BRKPT], 3);
+    //SETGATE(idt[IRQ_OFFSET+IRQ_TIMER], 0, GD_KT, vectors[IRQ_OFFSET+IRQ_TIMER], 3);
+    SETGATE(idt[T_SYSCALL], 0, GD_KT, vectors[T_SYSCALL], 3);
+    SETGATE(idt[T_BRKPT], 0, GD_KT, vectors[T_BRKPT], 3);
     //init system call
     //cprintf("sysenter_hander %x\n",sysenter_handler);
     //cprintf("kstop %x\n",KSTACKTOP);
@@ -221,6 +222,12 @@ trap_dispatch(struct Trapframe *tf)
             page_fault_handler(tf);
             return;
             break;
+        case IRQ_OFFSET+IRQ_TIMER:
+            cprintf("Timer\n");
+            lapic_eoi();
+            sched_yield();
+            return;
+            break;
     }
 
 	// Unexpected trap: The user process or the kernel has a bug.
@@ -258,12 +265,14 @@ trap(struct Trapframe *tf)
 	// the interrupt path.
 	assert(!(read_eflags() & FL_IF));
 
+    //cprintf("trap from %x\n",tf->tf_cs);
 	if ((tf->tf_cs & 3) == 3) {
 		// Trapped from user mode.
 		// Acquire the big kernel lock before doing any
 		// serious kernel work.
 		// LAB 4: Your code here.
         lock_kernel();
+        //cprintf("lock trap\n");
 		assert(curenv);
 
 		// Garbage collect if current enviroment is a zombie
@@ -311,6 +320,7 @@ page_fault_handler(struct Trapframe *tf)
 	// LAB 3: Your code here.
 	if ((tf->tf_cs & 3) != 3)
     {
+        print_trapframe(tf);
         panic("kernel page fault!");
     }
 

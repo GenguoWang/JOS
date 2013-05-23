@@ -579,6 +579,10 @@ sysenter_handler:
     pushl %edx
     pushl %eax 
     call syscall_wrapper
+    //sysenter will disable IF
+    //new version should never return!!use env_run to return and restore IF
+    //if use sysexit,must enable IF here(since could not done in user space)
+    //will cause interupt in kernel mode!!!not support in jos!!!
     popl %ebx
     popl %ebx
     popl %ebx
@@ -587,6 +591,11 @@ sysenter_handler:
     popl %ebx
     popl %ecx
     popl %edx
+    pushfl      //enable IF
+    movl (%esp),%ebx
+    orl $0x200,%ebx
+    movl %ebx, (%esp)
+    popfl
 /*
     movl %esi, %edx
     movl %ebp, %ecx
