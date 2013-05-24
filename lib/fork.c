@@ -48,7 +48,7 @@ pgfault(struct UTrapframe *utf)
 	if ((r = sys_page_unmap(0, PFTEMP)) < 0)
 		panic("pgfault sys_page_unmap: %e", r);
 	//panic("pgfault not implemented");
-    cprintf("%x pgfault handled %x %x %x\n",thisenv->env_id,addr,err,pddr);
+    //cprintf("%x pgfault handled %x %x %x\n",thisenv->env_id,addr,err,pddr);
 }
 
 //
