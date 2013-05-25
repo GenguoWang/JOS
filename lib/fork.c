@@ -83,7 +83,10 @@ static int
 duppage(envid_t envid, unsigned pn)
 {
 	int r;
+    pde_t pde = vpd[pn>>10];
+    if(!(pde&PTE_P)||!(pde&PTE_U) )return-1; 
     pte_t pte = vpt[pn];
+    if(!(pte&PTE_P)||!(pte&PTE_U) )return-1; 
     void * addr = (void*)(pn*PGSIZE);
     if((pte&PTE_U)&&((pte&PTE_W)||(pte&PTE_COW)))
     {
@@ -147,16 +150,28 @@ fork(void)
         thisenv =&envs[ENVX(sys_getenvid())];
         return 0;
     }
+   /* 
 	for (addr = (uint8_t*) UTEXT; addr < end; addr += PGSIZE)
 		duppage(envid, PGNUM(addr));
 
 	// Also copy the stack we are currently running on.
 	duppage(envid, PGNUM(ROUNDDOWN(&addr, PGSIZE)));
-
+    */
+    cprintf("USTACKTOP %x\n",USTACKTOP);
+	for (addr = (uint8_t*) UTEMP; addr < (uint8_t*)USTACKTOP; addr += PGSIZE)
+    {
+		duppage(envid, PGNUM(addr));
+    }
+   /* 
+    uint8_t* dd;
+    for(dd=UTEMP; dd<(uint8_t*)USTACKTOP;dd+=PGSIZE)
+        duppage(envid,PGNUM(dd));
+    */
     if((r=sys_page_alloc(envid,(void*)(UXSTACKTOP-PGSIZE),PTE_P|PTE_U|PTE_W))!=0)
     {
         panic("fork alloc error %e\n",r);
     }
+    
 	// Start the child environment running
     if((r=sys_env_set_pgfault_upcall(envid,_pgfault_upcall))!=0)
     {
